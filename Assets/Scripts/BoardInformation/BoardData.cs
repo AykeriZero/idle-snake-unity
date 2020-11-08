@@ -71,6 +71,7 @@ public class BoardData : MonoBehaviour {
     public static void MarkUsed(TileController t) {
         // get index to remove 
         int i = instance.free_tiles.IndexOf(t);
+        Debug.Assert(i != -1);
 
         instance.free_tiles[i] = instance.free_tiles[instance.free_tiles.Count - 1];
         instance.free_tiles.RemoveAt(instance.free_tiles.Count - 1);
@@ -78,6 +79,10 @@ public class BoardData : MonoBehaviour {
 
     public static TileController GetTile(Coordinate c) {
         return instance.tile_map[c.x, c.y];
+    }
+
+    public static TileController GetTile(int x, int y) {
+        return instance.tile_map[x, y];
     }
 
     // ------------ PRIVATE METHODS -------------------
@@ -166,6 +171,18 @@ public struct Coordinate {
     public Coordinate(int x_, int y_) {
         x = x_;
         y = y_;
+    }
+
+    public static bool operator ==(Coordinate c1, Coordinate c2) {
+        return c1.Equals(c2);
+    }
+
+    public static bool operator !=(Coordinate c1, Coordinate c2) {
+        return !c1.Equals(c2);
+    }
+
+    public bool Equals(Coordinate other) {
+        return (other.x == x && other.y == y);
     }
 }
 

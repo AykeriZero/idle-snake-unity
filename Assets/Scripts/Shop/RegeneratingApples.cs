@@ -6,6 +6,7 @@ using UnityEngine.UI;
 public class RegeneratingApples : MonoBehaviour {
     public int cost = 50;
     public float cost_increase_speed = 1.2f;
+    public int cost_linear_increase = 2;
 
     private int original_cost;
     private int num = 1;
@@ -20,9 +21,13 @@ public class RegeneratingApples : MonoBehaviour {
         ++num;
         n.text = num.ToString();
 
+        if (!BoardData.RandomApple()) {
+            num_inactive++;
+        }
+
         // update cost (must happen before spending gold)
         int old_cost = cost;
-        cost = (int) Mathf.Floor(cost * cost_increase_speed);
+        cost = (int) Mathf.Floor(cost * cost_increase_speed) + cost_linear_increase;
         c.text = cost.ToString();
 
         EventBus.Publish<SpendGoldEvent>(new SpendGoldEvent(old_cost));
@@ -32,10 +37,10 @@ public class RegeneratingApples : MonoBehaviour {
         EventBus.Subscribe<GoldChangeEvent>(_OnGoldChange);
         EventBus.Subscribe<SnakeAteAppleEvent>(_OnSnakeAteApple);
         EventBus.Subscribe<BoardGeneratedEvent>(_OnBoardGeneratedEvent);
+        EventBus.Subscribe<SnakeLengthReductionEvent>(_OnSnakeLengthReduction);
 
         original_cost = cost;
-        n.text = num.ToString();
-        c.text = cost.ToString();
+        UpdateText();
         b.interactable = false;
         go.SetActive(false);
     }
@@ -53,6 +58,15 @@ public class RegeneratingApples : MonoBehaviour {
             b.interactable = false;
         }
 
+    }
+
+    void _OnSnakeAteApple(SnakeAteAppleEvent e) {
+        if (!BoardData.RandomApple()) {
+            num_inactive++;
+        }
+    }
+
+    void _OnSnakeLengthReduction(SnakeLengthReductionEvent e) {
         // add inactive apples to the board
         while (num_inactive > 0) {
             if (BoardData.RandomApple()) {
@@ -63,25 +77,23 @@ public class RegeneratingApples : MonoBehaviour {
         }
     }
 
-    void _OnSnakeAteApple(SnakeAteAppleEvent e) {
-        if (!BoardData.RandomApple()) {
-            num_inactive++;
-        }
-    }
-
     void _OnBoardGeneratedEvent(BoardGeneratedEvent e) {
-        num = 1;
-        n.text = num.ToString();
-        cost = original_cost;
-        c.text = cost.ToString();
 
-        b.interactable = true;
+        //num = 1;
+        num_inactive = 0;
+        //cost = original_cost;
+
+        UpdateText();
+        b.interactable = false;
 
         for (int i = 0; i < num; ++i) {
             BoardData.RandomApple();
         }
     }
 
-
+    void UpdateText() {
+        n.text = num.ToString();
+        c.text = cost.ToString();
+    }
 
 }

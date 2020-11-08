@@ -9,6 +9,7 @@ public class SnakeController : MonoBehaviour {
 
     private Coordinate head;
     private Coordinate tail;
+    private int snake_length;
 
     // remember old coordinates for setting sprites
     private Coordinate prev_head;
@@ -18,9 +19,6 @@ public class SnakeController : MonoBehaviour {
 
     void Awake() {
         // instantiate data
-        head = new Coordinate(0, 0);
-        tail = new Coordinate(0, 0);
-        prev_head = new Coordinate(-1, -1);
         snake_next_memory = new Dictionary<Coordinate, Coordinate>();
 
         EventBus.Subscribe<BoardGeneratedEvent>(_OnBoardGenerated);
@@ -52,10 +50,9 @@ public class SnakeController : MonoBehaviour {
                 BoardData.MarkUsed(head_next);
             }
 
-            // Move the head
-
             // set sprites
             if (head_next_coordinate.x == tail.x && head_next_coordinate.y == tail.y) {
+                // if snake_length is 1, don't do fancy sprites
                 head_next.RemoveSnakeSprite();
             } else {
                 BoardData.GetTile(head).SetSnakeSprite(head_next_coordinate, head, prev_head);
@@ -65,8 +62,14 @@ public class SnakeController : MonoBehaviour {
 
             head_next.SetTileType(TileType.Snake);
 
+            // Move the head
+            snake_length++;
             prev_head = head;
             head = head_next_coordinate;
+
+            if (snake_length == BoardData.GetHeight() * BoardData.GetWidth()) {
+                EventBus.Publish<BoardFullEvent>(new BoardFullEvent());
+            }
         }
     }
 
@@ -82,38 +85,72 @@ public class SnakeController : MonoBehaviour {
         Coordinate prev_tail = tail;
         tail = snake_next_memory[tail];
 
+        snake_length--;
         snake_next_memory.Remove(prev_tail);
     }
 
     Coordinate CalculateNextTile(Coordinate cur) {
-        // left edge, move snake up
-        // if not at the top
-        if (cur.x == 0 && cur.y != BoardData.GetHeight() - 1) {
-            return new Coordinate(0, cur.y + 1);
+
+        Coordinate next_move = PathGenerator.GetNextTile(cur);
+
+        // if the snake is quite large, just return next_move
+        if (snake_length > BoardData.GetHeight() * BoardData.GetWidth() * 0.6) {
+            return next_move;
         }
 
-        // if odd row, move to the right
-        if (cur.y % 2 == 1) {
-            // if at the end, move down
-            if (cur.x == BoardData.GetWidth() - 1) {
-                return new Coordinate(cur.x, cur.y - 1);
-            }
-            return new Coordinate(cur.x + 1, cur.y);
-        } else {
-            // if even row, move to the left
-
-            // if end, move down
-            if (cur.x == 1 && cur.y != 0) {
-                return new Coordinate(1, cur.y - 1);
-            }
-            return new Coordinate(cur.x - 1, cur.y);
+        // calculate potential other paths
+        List<Coordinate> possible_moves = new List<Coordinate>();
+        Coordinate p = new Coordinate(cur.x - 1, cur.y);
+        if (p.x >= 0 && p.x < BoardData.GetWidth() && p.y >= 0 && p.y < BoardData.GetHeight() &&
+            BoardData.GetTile(p).tileType != TileType.Snake && p != next_move) {
+            possible_moves.Add(p);
+        }
+        p = new Coordinate(cur.x + 1, cur.y);
+        if (p.x >= 0 && p.x < BoardData.GetWidth() && p.y >= 0 && p.y < BoardData.GetHeight() &&
+            BoardData.GetTile(p).tileType != TileType.Snake && p != next_move) {
+            possible_moves.Add(p);
+        }
+        p = new Coordinate(cur.x, cur.y - 1);
+        if (p.x >= 0 && p.x < BoardData.GetWidth() && p.y >= 0 && p.y < BoardData.GetHeight() &&
+            BoardData.GetTile(p).tileType != TileType.Snake && p != next_move) {
+            possible_moves.Add(p);
+        }
+        p = new Coordinate(cur.x, cur.y + 1);
+        if (p.x >= 0 && p.x < BoardData.GetWidth() && p.y >= 0 && p.y < BoardData.GetHeight() &&
+            BoardData.GetTile(p).tileType != TileType.Snake && p != next_move) {
+            possible_moves.Add(p);
         }
 
+        // if surrounded by snake, just return the next step
+        if (possible_moves.Count == 0) {
+            return next_move;
+        }
+
+        // if we find an apple, just continue down path
+        while (true) {
+            // if we find one of the possible moves, go that way instead
+            foreach (Coordinate possible_move in possible_moves) {
+                if (next_move == possible_move) {
+                    return next_move;
+                }
+            }
+
+            if (BoardData.GetTile(next_move).tileType != TileType.Clear) {
+                return PathGenerator.GetNextTile(cur);
+            }
+
+            next_move = PathGenerator.GetNextTile(next_move);
+        }
+
+        Debug.Assert(false);
+        return new Coordinate(-1, -1);
     }
 
     void _OnBoardGenerated(BoardGeneratedEvent e) {
         head = new Coordinate(0, 0);
         tail = new Coordinate(0, 0);
+        prev_head = new Coordinate(-1, -1);
+        snake_length = 1;
         snake_next_memory.Clear();
     }
 
